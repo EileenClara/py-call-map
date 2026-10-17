@@ -4,6 +4,8 @@ dist/
 .superpowers/
 .DS_Store
 Thumbs.db
+__pycache__/
+*.py[cod]
 media/main.js
 media/main.css
 media/main.js.map
