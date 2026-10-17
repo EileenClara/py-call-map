@@ -3,7 +3,7 @@
   "displayName": "PyCallMap",
   "description": "Visualize Python function calls as an interactive left-to-right call graph.",
   "version": "0.1.0",
-  "publisher": "local-dev",
+  "publisher": "Eileenclara",
   "license": "MIT",
   "icon": "media/icon.png",
   "engines": { "vscode": "^1.85.0" },
