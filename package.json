@@ -23,6 +23,26 @@
           "icon": "$(graph)"
         }
       ]
+    },
+    "configuration": {
+      "title": "PyCallMap",
+      "properties": {
+        "pyCallMap.pythonPath": {
+          "type": "string",
+          "default": "",
+          "description": "Path to the Python interpreter. Leave empty to auto-detect .venv or PATH."
+        },
+        "pyCallMap.autoRefreshOnSave": {
+          "type": "boolean",
+          "default": true,
+          "description": "Refresh the call graph when the bound Python file is saved."
+        },
+        "pyCallMap.showUncalledByDefault": {
+          "type": "boolean",
+          "default": false,
+          "description": "Show functions that are unreachable from any entry point when the panel opens."
+        }
+      }
     }
   },
   "capabilities": { "untrustedWorkspaces": { "supported": "limited" } },
