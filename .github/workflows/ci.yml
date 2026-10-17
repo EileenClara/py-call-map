@@ -1,0 +1,33 @@
+name: ci
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  test:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+        python: ["3.10", "3.11", "3.12"]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python }}
+      - run: npm ci
+      - run: npm run typecheck
+      - run: npm test
+      - run: python -m unittest discover -s test/python -p "test_*.py" -v
+      - run: npm run build
+      - run: npx vsce package --no-dependencies
+      - uses: actions/upload-artifact@v4
+        with:
+          name: vsix-${{ matrix.os }}-py${{ matrix.python }}
+          path: "*.vsix"

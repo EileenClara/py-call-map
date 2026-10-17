@@ -51,7 +51,7 @@
     "watch": "node esbuild.mjs --watch",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
-    "package": "npm run build && vsce package --no-dependencies"
+    "package": "npm run build && vsce package --no-dependencies --no-rewrite-relative-links"
   },
   "dependencies": {
     "cytoscape": "^3.30.2",
