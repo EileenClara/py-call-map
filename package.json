@@ -5,10 +5,10 @@
   "version": "0.1.0",
   "publisher": "local-dev",
   "license": "MIT",
+  "icon": "media/icon.png",
   "engines": { "vscode": "^1.85.0" },
   "categories": ["Visualization", "Programming Languages", "Educational"],
   "keywords": ["python", "call graph", "visualization", "call hierarchy", "education"],
-  "activationEvents": ["onCommand:pyCallMap.show"],
   "main": "./dist/extension.js",
   "contributes": {
     "commands": [
