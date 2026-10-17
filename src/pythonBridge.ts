@@ -1,5 +1,6 @@
 import { spawn as nodeSpawn } from "node:child_process";
 import * as path from "node:path";
+import { StringDecoder } from "node:string_decoder";
 import type { AnalyzerResult } from "./protocol";
 
 export class AnalyzerError extends Error {
@@ -90,6 +91,8 @@ export function runAnalyzer(
     let stdoutBytes = 0;
     let stderr = "";
     let settled = false;
+    const stdoutDecoder = new StringDecoder("utf8");
+    const stderrDecoder = new StringDecoder("utf8");
 
     const onAbort = (): void => {
       child.kill();
@@ -119,14 +122,14 @@ export function runAnalyzer(
 
     child.stdout?.on("data", (chunk: Buffer) => {
       stdoutBytes += chunk.length;
-      stdout += chunk.toString("utf8");
+      stdout += stdoutDecoder.write(chunk);
       if (stdoutBytes > maxOutputBytes) {
         child.kill();
         finish(new AnalyzerError(`Analyzer output exceeded ${maxOutputBytes} bytes`, stderr));
       }
     });
     child.stderr?.on("data", (chunk: Buffer) => {
-      stderr += chunk.toString("utf8");
+      stderr += stderrDecoder.write(chunk);
     });
     child.on("error", (error) => {
       if (isEnoent(error)) {
@@ -136,6 +139,8 @@ export function runAnalyzer(
       }
     });
     child.on("close", (code) => {
+      stdout += stdoutDecoder.end();
+      stderr += stderrDecoder.end();
       if (code !== 0) {
         finish(new AnalyzerError(`Analyzer exited with code ${code}`, stderr));
         return;

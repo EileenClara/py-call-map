@@ -22,6 +22,8 @@ interactive left-to-right diagram. Click a node to jump to its definition.
 
 ## 安装
 
+需要 Python 3.9 或更高版本（分析脚本使用了内置泛型），CI 在 Python 3.10–3.12 上测试。
+
 ### 从 VSIX 安装
 
 1. 下载发布附件中的 `.vsix` 文件。
@@ -58,7 +60,7 @@ npm run build
 - 不做局部变量类型推断，所以 `obj = MyClass(); obj.foo()` 不会连边
 - 不解析函数别名、`getattr`、`eval`、回调注册、装饰器内部调用
 - 多继承使用同文件父类的深度优先近似，不保证精确 MRO
-- 被跳过的调用会计入所在函数的「外部调用」数量
+- 被跳过的装饰器、默认值、注解调用不计入；只有无法解析（unresolvable）的调用会计入所在函数的「外部调用」数量
 
 ## 设置
 

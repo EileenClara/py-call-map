@@ -155,7 +155,7 @@ export class CallGraphController implements vscode.Disposable {
           : errorDiagnostic.message;
       this.postState({
         kind: "error",
-        title: "Syntax error",
+        title: errorDiagnostic.line > 0 ? "Syntax error" : "Analysis failed",
         detail,
         canOpenSettings: false,
       });
@@ -180,6 +180,20 @@ export class CallGraphController implements vscode.Disposable {
     }
     if (document.languageId !== "python") {
       this.postState({ kind: "notPython" });
+      return;
+    }
+    // Security gate: an untrusted workspace must never be able to choose the
+    // executable that runs the analyzer (via pyCallMap.pythonPath or a .venv),
+    // so refuse to spawn it and surface an error before any candidate resolution.
+    if (!vscode.workspace.isTrusted) {
+      this.lastResult = undefined;
+      this.postState({
+        kind: "error",
+        title: "Workspace not trusted",
+        detail:
+          "PyCallMap requires a trusted workspace to run its analyzer. Open this folder in a trusted window to view the call graph.",
+        canOpenSettings: false,
+      });
       return;
     }
     let mtimeMs: number;

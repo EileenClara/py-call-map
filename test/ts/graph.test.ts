@@ -109,6 +109,10 @@ describe("buildElements", () => {
       (element) => "kind" in element.data && element.data.id === "outer.inner"
     );
     expect(nested && "kind" in nested.data ? nested.data.kind : "").toBe("nested");
+    const dead = elements.find(
+      (element) => "unused" in element.data && element.data.id === "dead"
+    );
+    expect(dead && "unused" in dead.data ? dead.data.unused : false).toBe(true);
   });
 });
 
