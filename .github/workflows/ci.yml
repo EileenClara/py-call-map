@@ -26,7 +26,7 @@ jobs:
       - run: npm test
       - run: python -m unittest discover -s test/python -p "test_*.py" -v
       - run: npm run build
-      - run: npx vsce package --no-dependencies
+      - run: npx vsce package --no-dependencies --no-rewrite-relative-links
       - uses: actions/upload-artifact@v4
         with:
           name: vsix-${{ matrix.os }}-py${{ matrix.python }}
