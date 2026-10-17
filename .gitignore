@@ -4,3 +4,7 @@ dist/
 .superpowers/
 .DS_Store
 Thumbs.db
+media/main.js
+media/main.css
+media/main.js.map
+media/main.css.map

@@ -1,0 +1,49 @@
+{
+  "name": "py-call-map",
+  "displayName": "PyCallMap",
+  "description": "Visualize Python function calls as an interactive left-to-right call graph.",
+  "version": "0.1.0",
+  "publisher": "local-dev",
+  "license": "MIT",
+  "engines": { "vscode": "^1.85.0" },
+  "categories": ["Visualization", "Programming Languages", "Educational"],
+  "keywords": ["python", "call graph", "visualization", "call hierarchy", "education"],
+  "activationEvents": ["onCommand:pyCallMap.show"],
+  "main": "./dist/extension.js",
+  "contributes": {
+    "commands": [
+      { "command": "pyCallMap.show", "title": "PyCallMap: Show Function Call Graph" }
+    ],
+    "menus": {
+      "editor/title": [
+        {
+          "command": "pyCallMap.show",
+          "when": "editorLangId == python",
+          "group": "navigation",
+          "icon": "$(graph)"
+        }
+      ]
+    }
+  },
+  "capabilities": { "untrustedWorkspaces": { "supported": "limited" } },
+  "scripts": {
+    "build": "node esbuild.mjs",
+    "watch": "node esbuild.mjs --watch",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "package": "npm run build && vsce package --no-dependencies"
+  },
+  "dependencies": {
+    "cytoscape": "^3.30.2",
+    "cytoscape-dagre": "^2.5.0",
+    "dagre": "^0.8.5"
+  },
+  "devDependencies": {
+    "@types/node": "^20.14.0",
+    "@types/vscode": "^1.85.0",
+    "@vscode/vsce": "^3.0.0",
+    "esbuild": "^0.23.0",
+    "typescript": "^5.5.0",
+    "vitest": "^2.0.0"
+  }
+}
