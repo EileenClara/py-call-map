@@ -82,7 +82,7 @@
 
 ### 4.3 数据流
 
-1. 用户执行 `PyCallMap: 显示函数调用图`，或面板已打开时切换到另一个 Python 文件。
+1. 用户执行 `PyCallMap: Show Function Call Graph`，或面板已打开时切换到另一个 Python 文件。
 2. `controller` 取文档 URI 与绝对路径，若缓存命中（同路径且 mtime 未变）直接复用。
 3. 否则 `pythonBridge` 执行：
    `spawn(pythonPath, ["-I", "<extension>/python/analyze.py", "--file", "<abs path>"])`
@@ -307,7 +307,7 @@
 
 ### 8.1 命令与菜单
 
-- 命令 ID：`pyCallMap.show`，标题 `PyCallMap: 显示函数调用图`。
+- 命令 ID：`pyCallMap.show`，标题 `PyCallMap: Show Function Call Graph`。
 - 出现在命令面板，以及 Python 文件的编辑器标题栏（`menus.editor/title`，`when: editorLangId == python`）。
 - 激活事件：`onCommand:pyCallMap.show`。
 
@@ -328,12 +328,12 @@
 3. PATH 中的 `python3`（非 Windows）或 `python`；再尝试另一个。
 4. 全部失败 → 报"找不到 Python"状态。
 
-发现结果在本次会话内缓存；配置变化时清空缓存。解释器以 `--version` 验证，超时 3 秒。
+候选列表在每次分析时重新计算（开销可忽略），因此配置变化立即生效。分析时以 `-I` 启动候选解释器；若 spawn 报 `ENOENT`，尝试下一个候选。
 
 ### 8.4 子进程约束
 
 - 使用 `child_process.spawn`，参数数组，不经过 shell。
-- 工作目录设为绑定文件所在的 workspace folder（没有则用文件所在目录）。
+- 工作目录设为绑定文件所在目录；分析脚本只读取传入的绝对路径，不依赖 cwd。
 - 超时 5 秒；超时后 kill，并显示错误。
 - stdout 上限 10 MB；超过则终止并报错。
 - 扩展激活时定位 `analyze.py` 的绝对路径（`context.asAbsolutePath`）。
@@ -472,7 +472,7 @@ py-call-map/
 ## 13. 发布
 
 - 使用 `@vscode/vsce` 打包；先在干净的 VSCode 配置中安装 `.vsix` 验证。
-- Marketplace 元数据：`displayName`、`description`、`categories`（Visualization、Programming Languages、Education）、`keywords`、`repository`、`license: MIT`、`icon`。
+- Marketplace 元数据：`displayName`、`description`、`categories`（Visualization、Programming Languages、Educational）、`keywords`、`repository`、`license: MIT`、`icon`。
 - README 包含：功能截图/GIF、安装方式、使用说明、支持的语法与限制、隐私声明（本地分析、无遥测）。
 - 发布到 VSCode Marketplace（个人 publisher + PAT）；可选使用 `ovsx` 同步 Open VSX。
 - 版本遵循 semver，维护 CHANGELOG。
