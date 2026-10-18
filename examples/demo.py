@@ -7,7 +7,7 @@ def factorial(n):
 
 
 def load_data(path):
-    return open(path, encoding="utf-8").read()
+    return f"contents of {path}"
 
 
 def clean(text):
