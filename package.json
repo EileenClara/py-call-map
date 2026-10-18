@@ -11,7 +11,7 @@
     "url": "https://github.com/EileenClara/py-call-map.git"
   },
   "engines": { "vscode": "^1.85.0" },
-  "categories": ["Visualization", "Programming Languages", "Educational"],
+  "categories": ["Visualization", "Programming Languages", "Education"],
   "keywords": ["python", "call graph", "visualization", "call hierarchy", "education"],
   "main": "./dist/extension.js",
   "contributes": {
