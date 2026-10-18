@@ -43,7 +43,7 @@ npm run build
 ## 使用
 
 1. 打开一个 `.py` 文件或 `.ipynb` notebook。
-2. 执行命令 `PyCallMap: Show Function Call Graph`，或点击编辑器 / notebook 工具栏的图图标。
+2. 执行命令 `PyCallMap`，或点击编辑器 / notebook 工具栏的图图标。
 3. 在右侧面板查看调用图。
 
 ## 支持的写法

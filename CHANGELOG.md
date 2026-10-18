@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.2.1 - 2026-10-18
+
+- Shorten the command title to `PyCallMap`.
+
 ## 0.2.0 - 2026-10-17
 
 - Analyze a Jupyter notebook (`.ipynb`) as one program across all code cells.
