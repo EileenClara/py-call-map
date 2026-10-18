@@ -39,7 +39,7 @@ Expected: `git status --short` prints nothing.
 
 **Files:**
 - Create: `src/webview/palettes.ts`
-- Test: `src/webview/palettes.test.ts`
+- Test: `test/ts/palettes.test.ts`
 
 **Interfaces:**
 - Produces: `ColorScheme`, `ThemeKind`, `Palette`, `COLOR_SCHEMES`,
@@ -49,7 +49,7 @@ Expected: `git status --short` prints nothing.
 
 - [ ] **Step 1: Write the failing test**
 
-Create `src/webview/palettes.test.ts`:
+Create `test/ts/palettes.test.ts`:
 
 ```ts
 import { describe, expect, it } from "vitest";
@@ -59,7 +59,7 @@ import {
   resolvePalette,
   type ColorScheme,
   type ThemeKind,
-} from "./palettes";
+} from "../../src/webview/palettes";
 
 const FIXED: ColorScheme[] = ["vivid", "soft", "contrast"];
 const THEMES: ThemeKind[] = ["light", "dark"];
@@ -132,7 +132,7 @@ describe("COLOR_SCHEMES", () => {
 - [ ] **Step 2: Run the test and confirm it fails**
 
 ```powershell
-npx vitest run src/webview/palettes.test.ts
+npx vitest run test/ts/palettes.test.ts
 ```
 
 Expected: FAIL with `Failed to resolve import "./palettes"`.
@@ -309,7 +309,7 @@ export function resolvePalette(
 - [ ] **Step 4: Run the test and typecheck**
 
 ```powershell
-npx vitest run src/webview/palettes.test.ts
+npx vitest run test/ts/palettes.test.ts
 npm run typecheck
 ```
 
@@ -318,7 +318,7 @@ Expected: all palette tests PASS; typecheck prints nothing and exits 0.
 - [ ] **Step 5: Commit**
 
 ```powershell
-git add src/webview/palettes.ts src/webview/palettes.test.ts
+git add src/webview/palettes.ts test/ts/palettes.test.ts
 git commit -m "feat: add graph color palette presets"
 ```
 
