@@ -21,6 +21,7 @@ function fn(overrides: Partial<FunctionNode> & Pick<FunctionNode, "id">): Functi
     entry: overrides.entry ?? false,
     unused: overrides.unused ?? false,
     externalCalls: overrides.externalCalls ?? 0,
+    location: overrides.location,
   };
 }
 
@@ -113,6 +114,31 @@ describe("buildElements", () => {
       (element) => "unused" in element.data && element.data.id === "dead"
     );
     expect(dead && "unused" in dead.data ? dead.data.unused : false).toBe(true);
+  });
+
+  it("copies notebook locations into node and edge data", () => {
+    const result = sample();
+    result.functions = result.functions.map((item) =>
+      item.id === "main" ? { ...item, location: "Cell 2 · line 1" } : item
+    );
+    result.edges = result.edges.map((edge) =>
+      edge.id === "e1" ? { ...edge, locations: ["Cell 2 · line 2"] } : edge
+    );
+
+    const elements = buildElements(result, false);
+    const node = elements.find(
+      (element) => "label" in element.data && element.data.id === "main"
+    );
+    expect(node && "externalCalls" in node.data ? node.data.location : undefined).toBe(
+      "Cell 2 · line 1"
+    );
+
+    const edge = elements.find(
+      (element) => "source" in element.data && element.data.id === "e1"
+    );
+    expect(
+      edge && "locations" in edge.data ? edge.data.locations : undefined
+    ).toEqual(["Cell 2 · line 2"]);
   });
 });
 

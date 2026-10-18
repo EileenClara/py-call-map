@@ -22,6 +22,7 @@ interface State {
   showUncalled: boolean;
   initialized: boolean;
   cursorLine?: number;
+  cursorEndLine?: number;
   warning?: string;
   status: "loading" | "graph" | "notPython" | "empty" | "error";
   error?: { title: string; detail: string; canOpenSettings: boolean };
@@ -167,16 +168,25 @@ function installHandlers(): void {
   });
   cy.on("mouseover", "node", (event) => {
     const data = event.target.data();
+    const location =
+      typeof data.location === "string"
+        ? data.location
+        : `lines ${data.line}-${data.endLine}`;
     showTooltip(
-      `${data.signature}\nlines ${data.line}-${data.endLine}\nexternal calls: ${data.externalCalls}`,
+      `${data.signature}\n${location}\nexternal calls: ${data.externalCalls}`,
       event.renderedPosition
     );
   });
   cy.on("mouseout", "node", () => hideTooltip());
   cy.on("mouseover", "edge", (event) => {
     const data = event.target.data();
+    const locations = data.locations as string[] | undefined;
+    const where =
+      locations && locations.length > 0
+        ? locations.join(", ")
+        : `lines ${(data.lines as number[]).join(", ")}`;
     showTooltip(
-      `${data.source} → ${data.target}\nlines ${(data.lines as number[]).join(", ")}`,
+      `${data.source} → ${data.target}\n${where}`,
       event.renderedPosition
     );
   });
@@ -221,13 +231,33 @@ function updateCursor(): void {
   if (!cy || !state.result) {
     return;
   }
-  const target =
-    state.cursorLine !== undefined
-      ? findFunctionAtLine(state.result.functions, state.cursorLine)
-      : undefined;
   cy.nodes().removeClass("cursor");
-  if (target) {
-    cy.getElementById(target.id).addClass("cursor");
+  if (state.cursorLine === undefined) {
+    return;
+  }
+  if (state.cursorEndLine === undefined) {
+    const target = findFunctionAtLine(state.result.functions, state.cursorLine);
+    if (target) {
+      cy.getElementById(target.id).addClass("cursor");
+    }
+    return;
+  }
+  const start = state.cursorLine;
+  const end = state.cursorEndLine;
+  const candidates = state.result.functions.filter(
+    (fn) => fn.line <= end && start <= fn.endLine
+  );
+  for (const fn of candidates) {
+    const containsNested = candidates.some(
+      (other) =>
+        other !== fn &&
+        fn.line <= other.line &&
+        other.endLine <= fn.endLine &&
+        other.endLine - other.line < fn.endLine - fn.line
+    );
+    if (!containsNested) {
+      cy.getElementById(fn.id).addClass("cursor");
+    }
   }
 }
 
@@ -310,6 +340,7 @@ window.addEventListener("message", (event: MessageEvent<HostToWebview>) => {
   }
   if (message.type === "cursor") {
     state.cursorLine = message.line;
+    state.cursorEndLine = message.endLine;
     updateCursor();
     return;
   }

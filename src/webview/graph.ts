@@ -10,6 +10,7 @@ export interface GraphNodeData {
   kind: FunctionNode["kind"];
   signature: string;
   externalCalls: number;
+  location?: string;
 }
 
 export interface GraphEdgeData {
@@ -19,6 +20,7 @@ export interface GraphEdgeData {
   lines: number[];
   cyclic: boolean;
   label: string;
+  locations?: string[];
 }
 
 export type GraphElement =
@@ -99,6 +101,7 @@ export function buildElements(
       kind: fn.kind,
       signature: fn.signature,
       externalCalls: fn.externalCalls,
+      location: fn.location,
     },
   }));
   const edges: GraphElement[] = result.edges
@@ -111,6 +114,7 @@ export function buildElements(
         lines: edge.lines,
         cyclic: edge.cyclic,
         label: edge.lines.length > 1 ? `×${edge.lines.length}` : "",
+        locations: edge.locations,
       },
     }));
   return [...nodes, ...edges];

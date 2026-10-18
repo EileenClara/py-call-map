@@ -54,7 +54,7 @@ export type WebviewState =
 
 export type HostToWebview =
   | { type: "graph"; payload: AnalyzerResult; showUncalled: boolean; warning?: string }
-  | { type: "cursor"; line: number }
+  | { type: "cursor"; line: number; endLine?: number }
   | { type: "state"; state: WebviewState };
 
 export type WebviewToHost =
