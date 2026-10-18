@@ -120,8 +120,15 @@ export class CallGraphController implements vscode.Disposable {
     );
   }
 
+  private invalidateAnalysis(): void {
+    this.analysisGeneration += 1;
+    this.analysisAbort?.abort();
+    this.analysisAbort = undefined;
+  }
+
   private bindDocument(document: vscode.TextDocument): void {
     if (this.boundUri()?.toString() !== document.uri.toString()) {
+      this.invalidateAnalysis();
       this.lastResult = undefined;
       this.lastSource = undefined;
       this.currentState = undefined;
@@ -131,6 +138,7 @@ export class CallGraphController implements vscode.Disposable {
 
   private bindNotebook(notebook: vscode.NotebookDocument): void {
     if (this.boundUri()?.toString() !== notebook.uri.toString()) {
+      this.invalidateAnalysis();
       this.lastResult = undefined;
       this.lastSource = undefined;
       this.currentState = undefined;
@@ -532,7 +540,10 @@ export class CallGraphController implements vscode.Disposable {
     if (event.notebook.uri.toString() !== bound.notebook.uri.toString()) {
       return;
     }
-    if (event.contentChanges.length === 0) {
+    const contentChanged =
+      event.contentChanges.length > 0 ||
+      event.cellChanges.some((change) => change.document !== undefined);
+    if (!contentChanged) {
       return;
     }
     this.scheduleRefresh();
