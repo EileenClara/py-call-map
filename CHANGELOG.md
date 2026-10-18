@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.3.0 - 2026-10-18
+
+- Add four selectable graph color schemes (Default, Vivid, Soft, High contrast).
+- Remember the chosen scheme across windows.
+
 ## 0.2.4 - 2026-10-18
 
 - Use an absolute URL for the README screenshot so it renders on the Marketplace.

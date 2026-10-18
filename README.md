@@ -16,6 +16,7 @@ interactive left-to-right diagram. Click a node to jump to its definition.
 - Click a node to jump to the function definition; click an edge to jump to the call site
 - The function under the cursor is highlighted as you move through the code
 - Auto-refresh when the file is saved or a notebook cell changes
+- Four graph color schemes from the toolbar: Default, Vivid, Soft, and High contrast
 - Follows the VSCode dark/light theme
 - All analysis runs locally: no network requests, no telemetry
 
