@@ -12,6 +12,7 @@ export interface FunctionNode {
   entry: boolean;
   unused: boolean;
   externalCalls: number;
+  location?: string;
 }
 
 export interface CallEdge {
@@ -20,6 +21,7 @@ export interface CallEdge {
   target: string;
   lines: number[];
   cyclic: boolean;
+  locations?: string[];
 }
 
 export interface Diagnostic {
