@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.2.2 - 2026-10-18
+
+- Rewrite the README and Marketplace listing in English.
+
 ## 0.2.1 - 2026-10-18
 
 - Shorten the command title to `PyCallMap`.
