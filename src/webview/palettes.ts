@@ -149,7 +149,7 @@ export function resolvePalette(
       nodeFill: cssVar("--vscode-editorWidget-background", "#252526"),
       nodeBorder: cssVar("--vscode-editorWidget-border", "#454545"),
       nodeText: cssVar("--vscode-editor-foreground", "#cccccc"),
-      entryFill: cssVar("--vscode-list-activeSelectionBackground", "#094771"),
+      entryFill: cssVar("--vscode-editorWidget-background", "#252526"),
       entryBorder: cssVar("--vscode-focusBorder", "#007acc"),
       methodBorder: cssVar("--vscode-symbolIcon-methodForeground", "#4ec9b0"),
       nestedBorder: cssVar(

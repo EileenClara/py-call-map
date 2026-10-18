@@ -46,6 +46,8 @@ describe("resolvePalette", () => {
     expect(seen).toContain("--vscode-editor-background");
     expect(seen).toContain("--vscode-focusBorder");
     expect(palette.nodeFill).toBe("#252526");
+    // Some themes use a dark selection color; entries must not become dark blobs.
+    expect(palette.entryFill).toBe(palette.nodeFill);
   });
 });
 

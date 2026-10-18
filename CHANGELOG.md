@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.3.1 - 2026-10-18
+
+- Keep Default entry nodes readable on themes whose selection color is dark.
+
 ## 0.3.0 - 2026-10-18
 
 - Add four selectable graph color schemes (Default, Vivid, Soft, High contrast).
