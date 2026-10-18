@@ -1,8 +1,18 @@
 import * as vscode from "vscode";
 import { spawn as nodeSpawn } from "node:child_process";
 import * as fs from "node:fs";
-import { analyzeFile, AnalyzerError, PythonNotFoundError } from "./pythonBridge";
+import {
+  analyzeFile,
+  AnalyzerError,
+  PythonNotFoundError,
+} from "./pythonBridge";
 import { lineToIndex } from "./lineNumbers";
+import { analyzeNotebook } from "./notebookAnalysis";
+import {
+  cellRangeFor,
+  concatLineToCell,
+  type NotebookSource,
+} from "./notebook";
 import type {
   AnalyzerResult,
   HostToWebview,
@@ -11,17 +21,22 @@ import type {
 } from "./protocol";
 
 interface CacheEntry {
-  mtimeMs: number;
+  stamp: number;
   result: AnalyzerResult;
+  source?: NotebookSource;
 }
+
+type BoundSource =
+  | { kind: "file"; document: vscode.TextDocument }
+  | { kind: "notebook"; notebook: vscode.NotebookDocument };
 
 export class CallGraphController implements vscode.Disposable {
   private panel: vscode.WebviewPanel | undefined;
   private panelReady = false;
   private panelDisposables: vscode.Disposable[] = [];
-  private boundUri: vscode.Uri | undefined;
-  private boundDocument: vscode.TextDocument | undefined;
+  private bound: BoundSource | undefined;
   private lastResult: AnalyzerResult | undefined;
+  private lastSource: NotebookSource | undefined;
   private currentState: WebviewState | undefined;
   private analysisGeneration = 0;
   private analysisAbort: AbortController | undefined;
@@ -33,9 +48,19 @@ export class CallGraphController implements vscode.Disposable {
   constructor(private readonly context: vscode.ExtensionContext) {}
 
   async show(): Promise<void> {
+    const notebookEditor = vscode.window.activeNotebookEditor;
+    if (notebookEditor) {
+      this.ensurePanel();
+      this.panel?.reveal(undefined, true);
+      this.bindNotebook(notebookEditor.notebook);
+      await this.refresh(true);
+      return;
+    }
     const editor = vscode.window.activeTextEditor;
     if (!editor) {
-      void vscode.window.showInformationMessage("Open a Python file first.");
+      void vscode.window.showInformationMessage(
+        "Open a Python file or notebook first."
+      );
       return;
     }
     this.ensurePanel();
@@ -44,7 +69,7 @@ export class CallGraphController implements vscode.Disposable {
       this.postState({ kind: "notPython" });
       return;
     }
-    this.bind(editor.document);
+    this.bindDocument(editor.document);
     await this.refresh(true);
   }
 
@@ -75,10 +100,19 @@ export class CallGraphController implements vscode.Disposable {
       vscode.window.onDidChangeTextEditorSelection((event) => this.onSelectionChanged(event)),
       vscode.window.onDidChangeActiveTextEditor((editor) => this.onActiveEditorChanged(editor)),
       vscode.workspace.onDidSaveTextDocument((document) => this.onSaved(document)),
+      vscode.window.onDidChangeNotebookEditorSelection((event) =>
+        this.onNotebookSelectionChanged(event)
+      ),
+      vscode.window.onDidChangeActiveNotebookEditor((editor) =>
+        this.onActiveNotebookEditorChanged(editor)
+      ),
+      vscode.workspace.onDidChangeNotebookDocument((event) =>
+        this.onNotebookChanged(event)
+      ),
       vscode.workspace.onDidChangeConfiguration((event) => {
         if (event.affectsConfiguration("pyCallMap")) {
           this.cache.clear();
-          if (this.boundDocument) {
+          if (this.bound) {
             void this.refresh(true);
           }
         }
@@ -86,13 +120,31 @@ export class CallGraphController implements vscode.Disposable {
     );
   }
 
-  private bind(document: vscode.TextDocument): void {
-    if (this.boundUri?.toString() !== document.uri.toString()) {
+  private bindDocument(document: vscode.TextDocument): void {
+    if (this.boundUri()?.toString() !== document.uri.toString()) {
       this.lastResult = undefined;
+      this.lastSource = undefined;
       this.currentState = undefined;
     }
-    this.boundDocument = document;
-    this.boundUri = document.uri;
+    this.bound = { kind: "file", document };
+  }
+
+  private bindNotebook(notebook: vscode.NotebookDocument): void {
+    if (this.boundUri()?.toString() !== notebook.uri.toString()) {
+      this.lastResult = undefined;
+      this.lastSource = undefined;
+      this.currentState = undefined;
+    }
+    this.bound = { kind: "notebook", notebook };
+  }
+
+  private boundUri(): vscode.Uri | undefined {
+    if (!this.bound) {
+      return undefined;
+    }
+    return this.bound.kind === "file"
+      ? this.bound.document.uri
+      : this.bound.notebook.uri;
   }
 
   private async onMessage(message: WebviewToHost): Promise<void> {
@@ -145,24 +197,36 @@ export class CallGraphController implements vscode.Disposable {
     this.post({ type: "graph", payload: result, showUncalled, warning });
   }
 
-  private renderResult(result: AnalyzerResult): void {
+  private renderResult(
+    result: AnalyzerResult,
+    source?: NotebookSource
+  ): void {
+    this.lastSource = source;
     const errorDiagnostic = result.diagnostics.find((item) => item.severity === "error");
     if (errorDiagnostic) {
       this.lastResult = undefined;
-      const detail =
+      this.lastSource = undefined;
+      let detail =
         errorDiagnostic.line > 0
           ? `Line ${errorDiagnostic.line}: ${errorDiagnostic.message}`
           : errorDiagnostic.message;
-      this.postState({
-        kind: "error",
-        title: errorDiagnostic.line > 0 ? "Syntax error" : "Analysis failed",
-        detail,
-        canOpenSettings: false,
-      });
+      let title = errorDiagnostic.line > 0 ? "Syntax error" : "Analysis failed";
+      if (source && errorDiagnostic.line > 0) {
+        const position = concatLineToCell(source, errorDiagnostic.line);
+        const range = position
+          ? source.ranges.find((item) => item.cellIndex === position.cellIndex)
+          : undefined;
+        if (position && range) {
+          detail = `Cell ${range.codeNumber}: ${errorDiagnostic.message}`;
+          title = "Syntax error";
+        }
+      }
+      this.postState({ kind: "error", title, detail, canOpenSettings: false });
       return;
     }
     if (result.functions.length === 0) {
       this.lastResult = undefined;
+      this.lastSource = undefined;
       this.postState({ kind: "empty" });
       return;
     }
@@ -171,14 +235,11 @@ export class CallGraphController implements vscode.Disposable {
   }
 
   private async refresh(force: boolean): Promise<void> {
-    if (!this.panel) {
+    if (!this.panel || !this.bound) {
       return;
     }
-    const document = this.boundDocument;
-    if (!document) {
-      return;
-    }
-    if (document.languageId !== "python") {
+    const bound = this.bound;
+    if (bound.kind === "file" && bound.document.languageId !== "python") {
       this.postState({ kind: "notPython" });
       return;
     }
@@ -196,6 +257,11 @@ export class CallGraphController implements vscode.Disposable {
       });
       return;
     }
+    if (bound.kind === "notebook") {
+      await this.refreshNotebook(bound.notebook, force);
+      return;
+    }
+    const document = bound.document;
     let mtimeMs: number;
     try {
       const stat = await vscode.workspace.fs.stat(document.uri);
@@ -211,7 +277,7 @@ export class CallGraphController implements vscode.Disposable {
     }
     const cacheKey = document.uri.fsPath;
     const cached = this.cache.get(cacheKey);
-    if (!force && cached && cached.mtimeMs === mtimeMs) {
+    if (!force && cached && cached.stamp === mtimeMs) {
       this.cache.delete(cacheKey);
       this.cache.set(cacheKey, cached);
       this.renderResult(cached.result);
@@ -244,9 +310,71 @@ export class CallGraphController implements vscode.Disposable {
       if (generation !== this.analysisGeneration) {
         return;
       }
-      this.cache.set(cacheKey, { mtimeMs, result });
+      this.cache.set(cacheKey, { stamp: mtimeMs, result });
       this.trimCache();
       this.renderResult(result);
+    } catch (error) {
+      if (generation !== this.analysisGeneration || abortController.signal.aborted) {
+        return;
+      }
+      this.reportAnalysisError(error);
+    }
+  }
+
+  private async refreshNotebook(
+    notebook: vscode.NotebookDocument,
+    force: boolean
+  ): Promise<void> {
+    const cacheKey = notebook.uri.toString();
+    const stamp = notebook.version;
+    const cached = this.cache.get(cacheKey);
+    if (!force && cached && cached.stamp === stamp) {
+      this.cache.delete(cacheKey);
+      this.cache.set(cacheKey, cached);
+      this.renderResult(cached.result, cached.source);
+      return;
+    }
+    const cells = notebook
+      .getCells()
+      .map((cell, index) => ({ cell, index }))
+      .filter((item) => item.cell.kind === vscode.NotebookCellKind.Code)
+      .map((item) => ({ index: item.index, text: item.cell.document.getText() }));
+    const generation = ++this.analysisGeneration;
+    this.analysisAbort?.abort();
+    const abortController = new AbortController();
+    this.analysisAbort = abortController;
+    this.postState({ kind: "loading" });
+    try {
+      const analysis = await analyzeNotebook(
+        cells,
+        notebook.uri.fsPath,
+        {
+          platform: process.platform,
+          pathExists: (candidate) => fs.existsSync(candidate),
+          workspaceFolder: vscode.workspace.getWorkspaceFolder(notebook.uri)?.uri
+            .fsPath,
+          pythonPathSetting: vscode.workspace
+            .getConfiguration("pyCallMap")
+            .get<string>("pythonPath", ""),
+        },
+        this.context.asAbsolutePath("python/analyze.py"),
+        {
+          spawn: nodeSpawn,
+          timeoutMs: 5000,
+          maxOutputBytes: 10 * 1024 * 1024,
+          signal: abortController.signal,
+        }
+      );
+      if (generation !== this.analysisGeneration) {
+        return;
+      }
+      this.cache.set(cacheKey, {
+        stamp,
+        result: analysis.result,
+        source: analysis.source,
+      });
+      this.trimCache();
+      this.renderResult(analysis.result, analysis.source);
     } catch (error) {
       if (generation !== this.analysisGeneration || abortController.signal.aborted) {
         return;
@@ -298,13 +426,18 @@ export class CallGraphController implements vscode.Disposable {
   }
 
   private onSaved(document: vscode.TextDocument): void {
-    if (!this.panel || !this.boundUri) {
+    const bound = this.bound;
+    if (!this.panel || !bound || bound.kind !== "file") {
       return;
     }
-    if (document.uri.toString() !== this.boundUri.toString()) {
+    if (document.uri.toString() !== bound.document.uri.toString()) {
       return;
     }
-    if (!vscode.workspace.getConfiguration("pyCallMap").get<boolean>("autoRefreshOnSave", true)) {
+    if (
+      !vscode.workspace
+        .getConfiguration("pyCallMap")
+        .get<boolean>("autoRefreshOnSave", true)
+    ) {
       return;
     }
     this.scheduleRefresh();
@@ -327,21 +460,27 @@ export class CallGraphController implements vscode.Disposable {
     if (editor.document.languageId !== "python") {
       return;
     }
-    if (this.boundUri && editor.document.uri.toString() === this.boundUri.toString()) {
+    const bound = this.bound;
+    if (
+      bound &&
+      bound.kind === "file" &&
+      editor.document.uri.toString() === bound.document.uri.toString()
+    ) {
       if (this.lastResult) {
         this.postGraph(this.lastResult);
       }
       return;
     }
-    this.bind(editor.document);
+    this.bindDocument(editor.document);
     void this.refresh(false);
   }
 
   private onSelectionChanged(event: vscode.TextEditorSelectionChangeEvent): void {
-    if (!this.panel || !this.boundUri) {
+    const bound = this.bound;
+    if (!this.panel || !bound || bound.kind !== "file") {
       return;
     }
-    if (event.textEditor.document.uri.toString() !== this.boundUri.toString()) {
+    if (event.textEditor.document.uri.toString() !== bound.document.uri.toString()) {
       return;
     }
     if (this.cursorTimer) {
@@ -354,16 +493,99 @@ export class CallGraphController implements vscode.Disposable {
     }, 100);
   }
 
-  private async jump(line1Based: number): Promise<void> {
-    if (!this.boundUri) {
+  private onNotebookSelectionChanged(
+    event: vscode.NotebookEditorSelectionChangeEvent
+  ): void {
+    const bound = this.bound;
+    if (!this.panel || !bound || bound.kind !== "notebook") {
       return;
     }
-    let document = this.boundDocument;
-    if (!document || document.uri.toString() !== this.boundUri.toString()) {
-      document = await vscode.workspace.openTextDocument(this.boundUri);
+    if (
+      event.notebookEditor.notebook.uri.toString() !==
+      bound.notebook.uri.toString()
+    ) {
+      return;
     }
+    const cellIndex = event.selections[0]?.start ?? -1;
+    if (this.cursorTimer) {
+      clearTimeout(this.cursorTimer);
+    }
+    this.cursorTimer = setTimeout(() => {
+      this.cursorTimer = undefined;
+      const range =
+        cellIndex >= 0 && this.lastSource
+          ? cellRangeFor(this.lastSource, cellIndex)
+          : undefined;
+      if (range) {
+        this.post({ type: "cursor", line: range.line, endLine: range.endLine });
+      } else {
+        this.post({ type: "cursor", line: 0 });
+      }
+    }, 100);
+  }
+
+  private onNotebookChanged(event: vscode.NotebookDocumentChangeEvent): void {
+    const bound = this.bound;
+    if (!this.panel || !bound || bound.kind !== "notebook") {
+      return;
+    }
+    if (event.notebook.uri.toString() !== bound.notebook.uri.toString()) {
+      return;
+    }
+    if (event.contentChanges.length === 0) {
+      return;
+    }
+    this.scheduleRefresh();
+  }
+
+  private onActiveNotebookEditorChanged(
+    editor: vscode.NotebookEditor | undefined
+  ): void {
+    if (!this.panel || !editor) {
+      return;
+    }
+    const notebook = editor.notebook;
+    const bound = this.bound;
+    if (
+      bound &&
+      bound.kind === "notebook" &&
+      bound.notebook.uri.toString() === notebook.uri.toString()
+    ) {
+      if (this.lastResult) {
+        this.postGraph(this.lastResult);
+      }
+      return;
+    }
+    this.bindNotebook(notebook);
+    void this.refresh(false);
+  }
+
+  private async jump(line1Based: number): Promise<void> {
+    const bound = this.bound;
+    if (!bound) {
+      return;
+    }
+    if (bound.kind === "notebook") {
+      const position = this.lastSource
+        ? concatLineToCell(this.lastSource, line1Based)
+        : undefined;
+      if (!position) {
+        return;
+      }
+      const range = new vscode.NotebookRange(
+        position.cellIndex,
+        position.cellIndex + 1
+      );
+      const editor = await vscode.window.showNotebookDocument(bound.notebook, {
+        selections: [range],
+        preserveFocus: false,
+      });
+      editor.revealRange(range, vscode.NotebookEditorRevealType.InCenter);
+      return;
+    }
+    const document = bound.document;
     const visibleEditor = vscode.window.visibleTextEditors.find(
-      (editor) => editor.document.uri.toString() === this.boundUri?.toString()
+      (editor) => editor.document.uri.toString() === document.uri.toString()
     );
     const line = lineToIndex(line1Based);
     const position = new vscode.Position(line, 0);

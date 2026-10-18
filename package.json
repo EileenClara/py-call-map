@@ -2,7 +2,7 @@
   "name": "py-call-map",
   "displayName": "PyCallMap",
   "description": "Visualize Python function calls as an interactive left-to-right call graph.",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "publisher": "Eileenclara",
   "license": "MIT",
   "icon": "media/icon.png",
@@ -19,6 +19,14 @@
         {
           "command": "pyCallMap.show",
           "when": "editorLangId == python",
+          "group": "navigation",
+          "icon": "$(graph)"
+        }
+      ],
+      "notebook/toolbar": [
+        {
+          "command": "pyCallMap.show",
+          "when": "notebookType == jupyter-notebook",
           "group": "navigation",
           "icon": "$(graph)"
         }

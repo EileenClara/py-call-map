@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.2.0 - 2026-10-17
+
+- Analyze a Jupyter notebook (`.ipynb`) as one program across all code cells.
+- Cross-cell edges, cell-aware tooltips (`Cell N · line M`).
+- Click a node or edge to jump to the owning cell; the active cell's functions are highlighted.
+- Notebook toolbar button; notebooks re-analyze on change.
+
 ## 0.1.0 - 2026-10-17
 
 - Initial release.

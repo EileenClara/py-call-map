@@ -1,8 +1,8 @@
 # PyCallMap
 
-把 Python 文件里的函数调用关系画成一张横向调用图，点击节点即可跳到对应代码。
+把 Python 文件或 Jupyter notebook 里的函数调用关系画成一张横向调用图，点击节点即可跳到对应代码。
 
-PyCallMap visualizes the function call graph of a single Python file as an
+PyCallMap visualizes the function call graph of a single Python file or notebook as an
 interactive left-to-right diagram. Click a node to jump to its definition.
 
 ![PyCallMap screenshot](media/screenshot.png)
@@ -10,6 +10,7 @@ interactive left-to-right diagram. Click a node to jump to its definition.
 ## 功能
 
 - 横向有向调用图，每个函数只出现一次
+- 支持 Jupyter notebook：所有代码单元格合成一张调用图
 - 递归和互相调用用琥珀色虚线回边表示
 - 顶层函数、类方法、嵌套函数
 - 自动识别入口（模块级调用、`if __name__ == "__main__":`、`main`）
@@ -41,8 +42,8 @@ npm run build
 
 ## 使用
 
-1. 打开一个 `.py` 文件。
-2. 执行命令 `PyCallMap: Show Function Call Graph`，或点击编辑器标题栏的图图标。
+1. 打开一个 `.py` 文件或 `.ipynb` notebook。
+2. 执行命令 `PyCallMap: Show Function Call Graph`，或点击编辑器 / notebook 工具栏的图图标。
 3. 在右侧面板查看调用图。
 
 ## 支持的写法
@@ -61,6 +62,9 @@ npm run build
 - 不解析函数别名、`getattr`、`eval`、回调注册、装饰器内部调用
 - 多继承使用同文件父类的深度优先近似，不保证精确 MRO
 - 被跳过的装饰器、默认值、注解调用不计入；只有无法解析（unresolvable）的调用会计入所在函数的「外部调用」数量
+- Notebook 按文档顺序分析，忽略 `execution_count`
+- 以 `%%` 开头的 cell 会被整体跳过；`%`、`!`、`?` 魔术命令行按 `pass` 处理，因此其中的代码不会被分析
+- Notebook 只分析 code cell，忽略 markdown 和输出
 
 ## 设置
 
@@ -72,7 +76,7 @@ npm run build
 
 ## 隐私
 
-PyCallMap 只读取当前 Python 文件并在本地运行标准库分析脚本。它不发送任何数据，不包含遥测，也不执行用户代码。
+PyCallMap 只读取当前 Python 文件或 notebook 的 code cell，并把 notebook 单元格临时拼接成本地 `.py` 文件交给标准库分析脚本；该临时文件在分析结束后立即删除。它不发送任何数据，不包含遥测，也不执行用户代码。
 
 ## 开发
 
@@ -86,10 +90,10 @@ npm run package
 
 ## English summary
 
-PyCallMap renders a single Python file's function call graph as an interactive
+PyCallMap renders a single Python file's or notebook's function call graph as an interactive
 left-to-right diagram. It supports top-level functions, methods, nested
 functions, recursion, entry detection, click-to-code navigation, and cursor
-highlighting. Analysis runs locally with Python's standard library; no code is
+highlighting. Notebook cells are concatenated in document order into a temporary local file; no cell code is executed. Analysis runs locally with Python's standard library; no code is
 executed and no data leaves the machine.
 
 ## License
