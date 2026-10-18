@@ -734,6 +734,7 @@ export class CallGraphController implements vscode.Disposable {
       <span id="title">PyCallMap</span>
       <span id="file"></span>
       <span class="spacer"></span>
+      <select id="scheme" title="Color scheme" aria-label="Color scheme"></select>
       <button id="refresh" title="Refresh">&#x21bb;</button>
       <button id="fit" title="Fit">&#x2922;</button>
       <button id="toggle-uncalled" title="Show uncalled functions">&#x1f441;</button>

@@ -66,6 +66,16 @@ body {
   border-color: var(--vscode-inputOption-activeBorder);
 }
 
+#scheme {
+  height: 24px;
+  padding: 0 4px;
+  font-size: 12px;
+  color: var(--vscode-dropdown-foreground);
+  background: var(--vscode-dropdown-background);
+  border: 1px solid var(--vscode-dropdown-border);
+  border-radius: 3px;
+}
+
 #banner {
   padding: 5px 10px;
   background: var(--vscode-inputValidation-warningBackground);

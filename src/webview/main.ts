@@ -3,6 +3,14 @@ import dagre from "cytoscape-dagre";
 import "./styles.css";
 import type { AnalyzerResult, HostToWebview, WebviewToHost } from "../protocol";
 import { buildElements, findFunctionAtLine } from "./graph";
+import {
+  COLOR_SCHEMES,
+  isColorScheme,
+  resolvePalette,
+  type ColorScheme,
+  type Palette,
+  type ThemeKind,
+} from "./palettes";
 
 cytoscape.use(dagre);
 
@@ -16,6 +24,7 @@ const fileLabel = document.getElementById("file") as HTMLSpanElement;
 const refreshButton = document.getElementById("refresh") as HTMLButtonElement;
 const fitButton = document.getElementById("fit") as HTMLButtonElement;
 const toggleButton = document.getElementById("toggle-uncalled") as HTMLButtonElement;
+const schemeSelect = document.getElementById("scheme") as HTMLSelectElement;
 
 interface State {
   result?: AnalyzerResult;
@@ -27,6 +36,7 @@ interface State {
   status: "loading" | "graph" | "notPython" | "empty" | "error";
   error?: { title: string; detail: string; canOpenSettings: boolean };
   lastFile?: string;
+  scheme: ColorScheme;
 }
 
 interface GraphStylesheet {
@@ -38,6 +48,7 @@ const state: State = {
   showUncalled: false,
   initialized: false,
   status: "loading",
+  scheme: "default",
 };
 
 let cy: cytoscape.Core | undefined;
@@ -47,27 +58,33 @@ function cssVariable(name: string, fallback: string): string {
   return value || fallback;
 }
 
-function graphStyle(): GraphStylesheet[] {
-  const foreground = cssVariable("--vscode-editor-foreground", "#cccccc");
-  const nodeBackground = cssVariable("--vscode-editorWidget-background", "#252526");
-  const nodeBorder = cssVariable("--vscode-editorWidget-border", "#454545");
-  const entryBackground = cssVariable("--vscode-list-activeSelectionBackground", "#094771");
-  const entryBorder = cssVariable("--vscode-focusBorder", "#007acc");
-  const methodBorder = cssVariable("--vscode-symbolIcon-methodForeground", "#4ec9b0");
-  const nestedBorder = cssVariable("--vscode-symbolIcon-functionForeground", "#c586c0");
-  const edgeColor = cssVariable("--vscode-descriptionForeground", "#8a8a8a");
-  const cyclicColor = cssVariable("--vscode-editorWarning-foreground", "#d7a15c");
+function themeKind(): ThemeKind {
+  return document.body.classList.contains("vscode-light") ? "light" : "dark";
+}
+
+function currentPalette(): Palette {
+  return resolvePalette(state.scheme, themeKind(), cssVariable);
+}
+
+function applyPalette(): void {
+  canvas.style.background = currentPalette().background;
+  if (cy) {
+    cy.style(graphStyle() as unknown as cytoscape.StylesheetJson);
+  }
+}
+
+function graphStyle(palette: Palette = currentPalette()): GraphStylesheet[] {
   const fontFamily = cssVariable("--vscode-editor-font-family", "monospace");
   return [
     {
       selector: "node",
       style: {
         shape: "round-rectangle",
-        "background-color": nodeBackground,
-        "border-width": 1,
-        "border-color": nodeBorder,
+        "background-color": palette.nodeFill,
+        "border-width": palette.nodeBorderWidth,
+        "border-color": palette.nodeBorder,
         label: "data(label)",
-        color: foreground,
+        color: palette.nodeText,
         "font-size": 11,
         "font-family": fontFamily,
         width: "label",
@@ -82,18 +99,18 @@ function graphStyle(): GraphStylesheet[] {
     {
       selector: "node[?entry]",
       style: {
-        "background-color": entryBackground,
-        "border-color": entryBorder,
-        "border-width": 2,
+        "background-color": palette.entryFill,
+        "border-color": palette.entryBorder,
+        "border-width": palette.entryBorderWidth,
       },
     },
     {
       selector: 'node[kind = "method"]',
-      style: { "border-color": methodBorder },
+      style: { "border-color": palette.methodBorder },
     },
     {
       selector: 'node[kind = "nested"]',
-      style: { "border-color": nestedBorder },
+      style: { "border-color": palette.nestedBorder },
     },
     {
       selector: "node[?unused]",
@@ -101,27 +118,28 @@ function graphStyle(): GraphStylesheet[] {
     },
     {
       selector: "node.cursor",
-      style: { "border-width": 3, "border-color": foreground },
+      style: { "border-width": 3, "border-color": palette.nodeText },
     },
     {
       selector: "edge",
       style: {
-        width: 1.2,
-        "line-color": edgeColor,
-        "target-arrow-color": edgeColor,
+        width: palette.edgeWidth,
+        "line-color": palette.edge,
+        "target-arrow-color": palette.edge,
         "target-arrow-shape": "triangle",
         "curve-style": "bezier",
         label: "data(label)",
         "font-size": 9,
-        color: edgeColor,
+        color: palette.edge,
       },
     },
     {
       selector: "edge[?cyclic]",
       style: {
         "line-style": "dashed",
-        "line-color": cyclicColor,
-        "target-arrow-color": cyclicColor,
+        "line-color": palette.cycle,
+        "target-arrow-color": palette.cycle,
+        width: palette.cycleWidth,
       },
     },
   ];
@@ -325,6 +343,14 @@ function applyState(): void {
 
 window.addEventListener("message", (event: MessageEvent<HostToWebview>) => {
   const message = event.data;
+  if (message.type === "scheme") {
+    if (isColorScheme(message.scheme)) {
+      state.scheme = message.scheme;
+      schemeSelect.value = message.scheme;
+      applyPalette();
+    }
+    return;
+  }
   if (message.type === "graph") {
     state.result = message.payload;
     state.warning = message.warning;
@@ -377,12 +403,30 @@ toggleButton.addEventListener("click", () => {
   renderGraph();
 });
 
-const themeObserver = new MutationObserver(() => {
-  if (cy) {
-    cy.style(graphStyle() as unknown as cytoscape.StylesheetJson);
+for (const scheme of COLOR_SCHEMES) {
+  const option = document.createElement("option");
+  option.value = scheme.id;
+  option.textContent = scheme.label;
+  schemeSelect.append(option);
+}
+schemeSelect.value = state.scheme;
+schemeSelect.addEventListener("change", () => {
+  if (!isColorScheme(schemeSelect.value)) {
+    return;
   }
+  state.scheme = schemeSelect.value;
+  applyPalette();
+  vscode.postMessage({
+    type: "scheme",
+    scheme: state.scheme,
+  } satisfies WebviewToHost);
+});
+
+const themeObserver = new MutationObserver(() => {
+  applyPalette();
 });
 themeObserver.observe(document.body, { attributes: true, attributeFilter: ["class"] });
 
+applyPalette();
 applyState();
 vscode.postMessage({ type: "ready" } satisfies WebviewToHost);
