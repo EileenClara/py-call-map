@@ -1,3 +1,5 @@
+import type { ColorScheme } from "./webview/palettes";
+
 export type FunctionKind = "function" | "method" | "nested";
 
 export interface FunctionNode {
@@ -55,10 +57,12 @@ export type WebviewState =
 export type HostToWebview =
   | { type: "graph"; payload: AnalyzerResult; showUncalled: boolean; warning?: string }
   | { type: "cursor"; line: number; endLine?: number }
+  | { type: "scheme"; scheme: ColorScheme }
   | { type: "state"; state: WebviewState };
 
 export type WebviewToHost =
   | { type: "ready" }
+  | { type: "scheme"; scheme: ColorScheme }
   | { type: "jump"; line: number }
   | { type: "refresh" }
   | { type: "openSettings" };

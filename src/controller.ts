@@ -19,6 +19,7 @@ import type {
   WebviewState,
   WebviewToHost,
 } from "./protocol";
+import { isColorScheme, type ColorScheme } from "./webview/palettes";
 
 interface CacheEntry {
   stamp: number;
@@ -44,8 +45,12 @@ export class CallGraphController implements vscode.Disposable {
   private cursorTimer: NodeJS.Timeout | undefined;
   private readonly cache = new Map<string, CacheEntry>();
   private readonly output = vscode.window.createOutputChannel("PyCallMap");
+  private scheme: ColorScheme;
 
-  constructor(private readonly context: vscode.ExtensionContext) {}
+  constructor(private readonly context: vscode.ExtensionContext) {
+    const stored = context.globalState.get<unknown>("pyCallMap.colorScheme");
+    this.scheme = isColorScheme(stored) ? stored : "default";
+  }
 
   async show(): Promise<void> {
     const notebookEditor = vscode.window.activeNotebookEditor;
@@ -194,10 +199,20 @@ export class CallGraphController implements vscode.Disposable {
     switch (message.type) {
       case "ready":
         this.panelReady = true;
+        this.post({ type: "scheme", scheme: this.scheme });
         if (this.currentState) {
           this.post({ type: "state", state: this.currentState });
         } else if (this.lastResult) {
           this.postGraph(this.lastResult);
+        }
+        break;
+      case "scheme":
+        if (isColorScheme(message.scheme)) {
+          this.scheme = message.scheme;
+          void this.context.globalState.update(
+            "pyCallMap.colorScheme",
+            this.scheme
+          );
         }
         break;
       case "jump":
