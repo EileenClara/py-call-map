@@ -3,7 +3,7 @@
 Visualize the function call graph of a single Python file or Jupyter notebook as an
 interactive left-to-right diagram. Click a node to jump to its definition.
 
-![PyCallMap screenshot](media/screenshot.png)
+![PyCallMap screenshot](https://raw.githubusercontent.com/EileenClara/py-call-map/master/media/screenshot.png)
 
 ## Features
 

@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.2.4 - 2026-10-18
+
+- Use an absolute URL for the README screenshot so it renders on the Marketplace.
+
 ## 0.2.3 - 2026-10-18
 
 - Render the editor title action as an icon (`$(graph)`) instead of text.
