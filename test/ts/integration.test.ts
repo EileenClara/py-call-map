@@ -3,6 +3,7 @@ import * as fs from "node:fs";
 import * as os from "node:os";
 import * as path from "node:path";
 import { describe, expect, it } from "vitest";
+import { analyzeNotebook } from "../../src/notebookAnalysis";
 import { parseAnalyzerOutput } from "../../src/pythonBridge";
 
 function findPython(): string | undefined {
@@ -88,5 +89,88 @@ describe.skipIf(python === undefined)("analyzer integration", () => {
     } finally {
       fs.rmSync(tmpDir, { recursive: true, force: true });
     }
+  });
+
+  it("builds one graph across cells and maps lines back to cells", async () => {
+    const interpreter = python as string;
+    const scriptPath = path.resolve(process.cwd(), "python", "analyze.py");
+    const analyzedPaths: string[] = [];
+    const recordingSpawn = ((
+      command: string,
+      args: string[],
+      options: Parameters<typeof spawn>[2]
+    ) => {
+      const fileIndex = args.indexOf("--file");
+      if (fileIndex >= 0) {
+        analyzedPaths.push(String(args[fileIndex + 1]));
+      }
+      return spawn(command, args, options);
+    }) as unknown as typeof spawn;
+
+    const analysis = await analyzeNotebook(
+      [
+        { index: 0, text: "def greet():\n    return 1" },
+        { index: 2, text: "def main():\n    greet()" },
+      ],
+      path.join(os.tmpdir(), "demo.ipynb"),
+      {
+        platform: process.platform,
+        pathExists: () => true,
+        workspaceFolder: undefined,
+        pythonPathSetting: interpreter,
+      },
+      scriptPath,
+      { spawn: recordingSpawn, timeoutMs: 5000, maxOutputBytes: 10 * 1024 * 1024 }
+    );
+
+    expect(analysis.source.ranges).toEqual([
+      { cellIndex: 0, codeNumber: 1, startLine: 1, lineCount: 2 },
+      { cellIndex: 2, codeNumber: 2, startLine: 3, lineCount: 2 },
+    ]);
+    expect(analysis.source.skippedCells).toEqual([]);
+
+    const greet = analysis.result.functions.find((fn) => fn.id === "greet");
+    const main = analysis.result.functions.find((fn) => fn.id === "main");
+    expect(greet?.location).toBe("Cell 1 · line 1");
+    expect(main?.location).toBe("Cell 2 · line 1");
+
+    const edge = analysis.result.edges.find(
+      (item) => item.source === "main" && item.target === "greet"
+    );
+    expect(edge?.locations).toEqual(["Cell 2 · line 2"]);
+
+    expect(analysis.result.file).toBe(path.join(os.tmpdir(), "demo.ipynb"));
+    expect(analyzedPaths).toHaveLength(1);
+    expect(fs.existsSync(analyzedPaths[0])).toBe(false);
+  });
+});
+
+describe("analyzeNotebook", () => {
+  it("returns an empty result without spawning for an empty notebook", async () => {
+    let spawned = false;
+    const analysis = await analyzeNotebook(
+      [{ index: 0, text: "\n\n" }],
+      "/work/empty.ipynb",
+      {
+        platform: process.platform,
+        pathExists: () => true,
+        workspaceFolder: undefined,
+        pythonPathSetting: "",
+      },
+      "unused-analyze.py",
+      {
+        spawn: (() => {
+          spawned = true;
+          throw new Error("must not spawn");
+        }) as unknown as typeof spawn,
+      }
+    );
+
+    expect(spawned).toBe(false);
+    expect(analysis.result.functions).toEqual([]);
+    expect(analysis.result.edges).toEqual([]);
+    expect(analysis.result.diagnostics).toEqual([]);
+    expect(analysis.result.file).toBe("/work/empty.ipynb");
+    expect(analysis.source.text).toBe("");
   });
 });
