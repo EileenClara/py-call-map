@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.2.3 - 2026-10-18
+
+- Render the editor title action as an icon (`$(graph)`) instead of text.
+- Detect notebooks from the active tab when `activeNotebookEditor` is unavailable.
+
 ## 0.2.2 - 2026-10-18
 
 - Rewrite the README and Marketplace listing in English.

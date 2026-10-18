@@ -56,6 +56,14 @@ export class CallGraphController implements vscode.Disposable {
       await this.refresh(true);
       return;
     }
+    const tabNotebook = await this.notebookFromActiveTab();
+    if (tabNotebook) {
+      this.ensurePanel();
+      this.panel?.reveal(undefined, true);
+      this.bindNotebook(tabNotebook);
+      await this.refresh(true);
+      return;
+    }
     const editor = vscode.window.activeTextEditor;
     if (!editor) {
       void vscode.window.showInformationMessage(
@@ -71,6 +79,22 @@ export class CallGraphController implements vscode.Disposable {
     }
     this.bindDocument(editor.document);
     await this.refresh(true);
+  }
+
+  // The command palette can steal focus from a notebook editor, leaving
+  // activeNotebookEditor undefined while a notebook tab is still active.
+  private async notebookFromActiveTab(): Promise<
+    vscode.NotebookDocument | undefined
+  > {
+    const input = vscode.window.tabGroups.activeTabGroup.activeTab?.input;
+    if (!(input instanceof vscode.TabInputNotebook)) {
+      return undefined;
+    }
+    try {
+      return await vscode.workspace.openNotebookDocument(input.uri);
+    } catch {
+      return undefined;
+    }
   }
 
   private ensurePanel(): void {
