@@ -109,6 +109,9 @@ export class CallGraphController implements vscode.Disposable {
       vscode.workspace.onDidChangeNotebookDocument((event) =>
         this.onNotebookChanged(event)
       ),
+      vscode.workspace.onDidCloseNotebookDocument((notebook) =>
+        this.onNotebookClosed(notebook)
+      ),
       vscode.workspace.onDidChangeConfiguration((event) => {
         if (event.affectsConfiguration("pyCallMap")) {
           this.cache.clear();
@@ -137,11 +140,16 @@ export class CallGraphController implements vscode.Disposable {
   }
 
   private bindNotebook(notebook: vscode.NotebookDocument): void {
-    if (this.boundUri()?.toString() !== notebook.uri.toString()) {
+    const boundNotebook =
+      this.bound?.kind === "notebook" ? this.bound.notebook : undefined;
+    if (boundNotebook !== notebook) {
       this.invalidateAnalysis();
       this.lastResult = undefined;
       this.lastSource = undefined;
       this.currentState = undefined;
+      if (boundNotebook?.uri.toString() === notebook.uri.toString()) {
+        this.cache.delete(notebook.uri.toString());
+      }
     }
     this.bound = { kind: "notebook", notebook };
   }
@@ -403,6 +411,7 @@ export class CallGraphController implements vscode.Disposable {
 
   private reportAnalysisError(error: unknown): void {
     this.lastResult = undefined;
+    this.lastSource = undefined;
     if (error instanceof PythonNotFoundError) {
       this.output.appendLine(`[error] ${error.message}`);
       this.postState({
@@ -496,6 +505,14 @@ export class CallGraphController implements vscode.Disposable {
     }
     this.cursorTimer = setTimeout(() => {
       this.cursorTimer = undefined;
+      const bound = this.bound;
+      if (
+        !bound ||
+        bound.kind !== "file" ||
+        bound.document.uri.toString() !== event.textEditor.document.uri.toString()
+      ) {
+        return;
+      }
       const line = event.selections[0]?.active.line ?? 0;
       this.post({ type: "cursor", line: line + 1 });
     }, 100);
@@ -520,6 +537,15 @@ export class CallGraphController implements vscode.Disposable {
     }
     this.cursorTimer = setTimeout(() => {
       this.cursorTimer = undefined;
+      const bound = this.bound;
+      if (
+        !bound ||
+        bound.kind !== "notebook" ||
+        bound.notebook.uri.toString() !==
+          event.notebookEditor.notebook.uri.toString()
+      ) {
+        return;
+      }
       const range =
         cellIndex >= 0 && this.lastSource
           ? cellRangeFor(this.lastSource, cellIndex)
@@ -549,6 +575,27 @@ export class CallGraphController implements vscode.Disposable {
     this.scheduleRefresh();
   }
 
+  private onNotebookClosed(notebook: vscode.NotebookDocument): void {
+    const bound = this.bound;
+    if (!bound || bound.kind !== "notebook" || bound.notebook !== notebook) {
+      return;
+    }
+    this.invalidateAnalysis();
+    this.bound = undefined;
+    this.lastResult = undefined;
+    this.lastSource = undefined;
+    this.currentState = undefined;
+    this.cache.delete(notebook.uri.toString());
+    if (this.refreshTimer) {
+      clearTimeout(this.refreshTimer);
+      this.refreshTimer = undefined;
+    }
+    if (this.cursorTimer) {
+      clearTimeout(this.cursorTimer);
+      this.cursorTimer = undefined;
+    }
+  }
+
   private onActiveNotebookEditorChanged(
     editor: vscode.NotebookEditor | undefined
   ): void {
@@ -557,11 +604,7 @@ export class CallGraphController implements vscode.Disposable {
     }
     const notebook = editor.notebook;
     const bound = this.bound;
-    if (
-      bound &&
-      bound.kind === "notebook" &&
-      bound.notebook.uri.toString() === notebook.uri.toString()
-    ) {
+    if (bound && bound.kind === "notebook" && bound.notebook === notebook) {
       if (this.lastResult) {
         this.postGraph(this.lastResult);
       }
@@ -587,7 +630,10 @@ export class CallGraphController implements vscode.Disposable {
         position.cellIndex,
         position.cellIndex + 1
       );
-      const editor = await vscode.window.showNotebookDocument(bound.notebook, {
+      const notebook = bound.notebook.isClosed
+        ? await vscode.workspace.openNotebookDocument(bound.notebook.uri)
+        : bound.notebook;
+      const editor = await vscode.window.showNotebookDocument(notebook, {
         selections: [range],
         preserveFocus: false,
       });

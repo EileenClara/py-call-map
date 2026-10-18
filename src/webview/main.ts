@@ -330,6 +330,8 @@ window.addEventListener("message", (event: MessageEvent<HostToWebview>) => {
     state.warning = message.warning;
     state.status = "graph";
     state.error = undefined;
+    state.cursorLine = undefined;
+    state.cursorEndLine = undefined;
     if (!state.initialized) {
       state.showUncalled = message.showUncalled;
       state.initialized = true;
